@@ -24,7 +24,9 @@ object AlarmScheduler {
     private const val TAG = "TajiduoAttendance"
     private const val REQUEST_CODE = 2001
     private const val REQUEST_CODE_SHOW = 2002
+    private const val REQUEST_CODE_FAILSAFE = 2003
     const val ACTION_ALARM = "com.tajiduo.attendance.action.ALARM"
+    const val ACTION_FAILSAFE = "com.tajiduo.attendance.action.FAILSAFE"
 
     fun scheduleNext(context: Context, hour: Int, minute: Int) {
         val manager = context.getSystemService(AlarmManager::class.java) ?: return
@@ -45,11 +47,32 @@ object AlarmScheduler {
     fun scheduleFromSettings(context: Context) {
         val settings = SettingsStore(context)
         scheduleNext(context, settings.hour, settings.minute)
+        scheduleFailsafe(context, settings.failsafeHour, settings.failsafeMinute)
+    }
+
+    /**
+     * 夜间补签检查（默认 23:30）：检查当天是否签到成功，未成功则重新触发签到。
+     * 同样以 setAlarmClock() 保证准点，使用独立 PendingIntent 与主闹钟并存。
+     */
+    fun scheduleFailsafe(context: Context, hour: Int, minute: Int) {
+        val manager = context.getSystemService(AlarmManager::class.java) ?: return
+        val triggerAt = nextTriggerMillis(hour, minute)
+        val pending = failsafePendingIntent(context)
+        try {
+            val info = AlarmManager.AlarmClockInfo(triggerAt, showIntent(context))
+            manager.setAlarmClock(info, pending)
+            Log.i(TAG, "failsafe check scheduled: ${formatNextTrigger(hour, minute)}")
+        }
+        catch (error: Exception) {
+            Log.w(TAG, "setAlarmClock failed for failsafe, fallback to setExactAndAllowWhileIdle", error)
+            manager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pending)
+        }
     }
 
     fun cancel(context: Context) {
         val manager = context.getSystemService(AlarmManager::class.java) ?: return
         manager.cancel(pendingIntent(context))
+        manager.cancel(failsafePendingIntent(context))
         Log.i(TAG, "alarm cancelled")
     }
 
@@ -77,6 +100,18 @@ object AlarmScheduler {
         return PendingIntent.getBroadcast(
             context,
             REQUEST_CODE,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
+
+    private fun failsafePendingIntent(context: Context): PendingIntent {
+        val intent = Intent(context, AttendanceAlarmReceiver::class.java).apply {
+            action = ACTION_FAILSAFE
+        }
+        return PendingIntent.getBroadcast(
+            context,
+            REQUEST_CODE_FAILSAFE,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )

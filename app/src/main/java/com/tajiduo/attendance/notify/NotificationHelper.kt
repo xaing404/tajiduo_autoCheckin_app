@@ -64,6 +64,21 @@ class NotificationHelper(private val context: Context) {
         notifyResult(message, success = false)
     }
 
+    /** 夜间检查结果通知（全部账号已签到，无需补签）。 */
+    fun notifyFailsafeResult(summary: String) {
+        if (!PermissionHelper.hasNotificationPermission(context)) return
+        val preview = summary.lineSequence().firstOrNull { it.isNotBlank() } ?: summary
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("塔吉多夜间检查完成")
+            .setContentText(preview)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(summary))
+            .setAutoCancel(true)
+            .setContentIntent(contentIntent())
+            .build()
+        notifyCompat(RESULT_ID, notification)
+    }
+
     private fun contentIntent(): PendingIntent {
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP

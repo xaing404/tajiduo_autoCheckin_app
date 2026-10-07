@@ -70,6 +70,17 @@ class SettingsStore(context: Context) {
     val emailConfigured: Boolean
         get() = emailSender.isNotBlank() && emailAuthCode.isNotBlank()
 
+    // ---------------- 夜间补签检查 ----------------
+
+    /** 夜间检查时间（默认 23:30）：当天未签到成功则重新触发一次签到。 */
+    var failsafeHour: Int
+        get() = prefs.getInt("failsafe_hour", 23)
+        set(value) = prefs.edit().putInt("failsafe_hour", value).apply()
+
+    var failsafeMinute: Int
+        get() = prefs.getInt("failsafe_minute", 30)
+        set(value) = prefs.edit().putInt("failsafe_minute", value).apply()
+
     /** 最近一次成功运行的日期（yyyy-MM-dd），用于 UI 提示。 */
     var lastRunDate: String
         get() = prefs.getString("last_run_date", "") ?: ""

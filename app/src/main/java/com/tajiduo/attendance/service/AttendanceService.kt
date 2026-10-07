@@ -46,7 +46,8 @@ class AttendanceService : Service() {
         running = true
         val force = intent?.getBooleanExtra(EXTRA_FORCE, false) ?: false
         val killAfter = intent?.getBooleanExtra(EXTRA_KILL_AFTER, false) ?: false
-        Log.i(TAG, "service start: force=$force killAfter=$killAfter")
+        val checkReport = intent?.getStringExtra(EXTRA_CHECK_REPORT)
+        Log.i(TAG, "service start: force=$force killAfter=$killAfter checkReport=${checkReport != null}")
 
         val helper = NotificationHelper(this)
         helper.ensureChannel()
@@ -58,7 +59,13 @@ class AttendanceService : Service() {
         )
         acquireWakeLock()
 
-        scope.launch { execute(force, killAfter) }
+        scope.launch {
+            if (checkReport != null) {
+                runCheckReport(checkReport, killAfter)
+            } else {
+                execute(force, killAfter)
+            }
+        }
         return START_NOT_STICKY
     }
 
@@ -138,6 +145,33 @@ class AttendanceService : Service() {
         }
     }
 
+    /**
+     * 夜间检查（全部已签）报告：仅发送结果通知与邮件，
+     * 不执行签到、不改写状态与历史，结束流程与常规运行一致（释放资源 + 可选自杀）。
+     */
+    private fun runCheckReport(summary: String, killAfter: Boolean) {
+        val settings = SettingsStore(this)
+        try {
+            Log.i(TAG, "check report: send notification=${settings.notifyEnabled}")
+            if (settings.notifyEnabled) {
+                NotificationHelper(this).notifyFailsafeResult(summary)
+            }
+            sendCheckEmailSafe(settings, summary)
+        }
+        catch (error: Exception) {
+            Log.e(TAG, "check report failed", error)
+        }
+        finally {
+            releaseWakeLock()
+            ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+            stopSelf()
+            if (killAfter && settings.killAfterRun) {
+                Log.i(TAG, "kill process for power saving")
+                android.os.Process.killProcess(android.os.Process.myPid())
+            }
+        }
+    }
+
     private fun sendWebhook(settings: SettingsStore, summary: String) {
         val urls = settings.notificationUrls
             .split(',')
@@ -198,6 +232,39 @@ class AttendanceService : Service() {
         }
     }
 
+    /**
+     * 夜间检查报告邮件（全部已签）：与签到结果邮件同通道（QQ 邮箱 SMTP），
+     * 未配置时静默跳过，失败仅记录日志。
+     */
+    private fun sendCheckEmailSafe(settings: SettingsStore, summary: String) {
+        if (!settings.emailConfigured) return
+        val recipient = settings.emailRecipient.ifBlank { settings.emailSender }
+        val now = System.currentTimeMillis()
+        val subject = "塔吉多签到 | 夜间检查·全部已签 | ${formatEmailTime(now)}"
+        val content = buildString {
+            appendLine("塔吉多夜间签到检查（自动发送）")
+            appendLine()
+            appendLine("检查时间：${formatEmailTime(now, withSeconds = true)}")
+            appendLine("检查结果：全部账号今日已签到，无需补签")
+            appendLine()
+            appendLine("——————————")
+            appendLine(summary)
+            appendLine("——————————")
+            append("本邮件由「塔吉多签到」App 自动发送，请勿直接回复。")
+        }
+        try {
+            val errors = EmailNotifier.send(settings.emailSender, settings.emailAuthCode, recipient, subject, content)
+            if (errors.isEmpty()) {
+                Log.i(TAG, "check email sent")
+            } else {
+                Log.e(TAG, "check email send failed: ${errors.joinToString("; ")}")
+            }
+        }
+        catch (error: Exception) {
+            Log.e(TAG, "check email send failed: ${error.message}")
+        }
+    }
+
     private fun formatEmailTime(timestamp: Long, withSeconds: Boolean = false): String =
         SimpleDateFormat(if (withSeconds) "yyyy-MM-dd HH:mm:ss" else "yyyy-MM-dd HH:mm", Locale.US)
             .apply { timeZone = TimeZone.getTimeZone("Asia/Shanghai") }
@@ -238,6 +305,9 @@ class AttendanceService : Service() {
         private const val TAG = "TajiduoAttendance"
         const val EXTRA_FORCE = "force"
         const val EXTRA_KILL_AFTER = "kill_after"
+
+        /** 非空时进入"夜间检查报告"模式：仅发送通知与邮件，不执行签到。 */
+        const val EXTRA_CHECK_REPORT = "check_report"
         const val ACTION_RUN_FINISHED = "com.tajiduo.attendance.action.RUN_FINISHED"
         const val EXTRA_SUMMARY = "summary"
         const val EXTRA_SUCCESS = "success"
@@ -246,6 +316,12 @@ class AttendanceService : Service() {
             Intent(context, AttendanceService::class.java).apply {
                 putExtra(EXTRA_FORCE, force)
                 putExtra(EXTRA_KILL_AFTER, killAfter)
+            }
+
+        fun buildCheckReportIntent(context: Context, summary: String): Intent =
+            Intent(context, AttendanceService::class.java).apply {
+                putExtra(EXTRA_KILL_AFTER, true)
+                putExtra(EXTRA_CHECK_REPORT, summary)
             }
     }
 }
