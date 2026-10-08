@@ -31,10 +31,10 @@
 
 ## 安装
 
-下载 [dist/tajiduo-attendance-v1.3.1.apk](dist/tajiduo-attendance-v1.3.1.apk) 后：
+下载 [dist/tajiduo-attendance-v1.3.2.apk](dist/tajiduo-attendance-v1.3.2.apk) 后：
 
 ```bash
-adb install -r dist/tajiduo-attendance-v1.3.1.apk
+adb install -r dist/tajiduo-attendance-v1.3.2.apk
 ```
 
 或把 APK 传到手机点击安装。要求 **Android 8.0+**（minSdk 26），targetSdk 34。
@@ -208,6 +208,12 @@ app/src/main/java/com/tajiduo/attendance/
 ```
 
 ## 更新记录
+
+### v1.3.2
+
+- **修复极端网络环境下邮件发送卡死导致丢失**：超级省电过夜 + 深度休眠唤醒后的首次网络连接中，JavaMail 内部超时曾失效，SMTP 调用阻塞导致进程挂起数小时、邮件丢失且无法自杀退出。现改为独立线程执行并设 45 秒硬性总时长上限，超时即放弃等待并继续后续流程；单次失败后自动重建连接重试一次。
+- 进程启动时设置 `java.net.preferIPv4Stack=true`，规避不可达 IPv6 路径造成的连接长时间阻塞。
+- 邮件发送结果新增持久化记录（`email:sign` / `email:check` + 日期 = `sent` / `failed: 原因`），便于出问题时快速排查。
 
 ### v1.3.1
 

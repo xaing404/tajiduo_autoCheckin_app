@@ -36,6 +36,15 @@ class StateStore(private val context: Context) {
         prefs.edit().putString("last-summary", summary).commit()
     }
 
+    /**
+     * 邮件发送结果记录（排查用）：scope 区分签到邮件（sign）/夜间检查邮件（check）。
+     * 同步落盘：进程可能随后立即自杀，异步写入会丢失。
+     */
+    fun recordEmailStatus(scope: String, date: String, ok: Boolean, detail: String) {
+        val value = if (ok) "sent" else "failed: $detail"
+        prefs.edit().putString("email:$scope:$date", value).commit()
+    }
+
     fun lastRecord(): RunRecord? = loadRuns().firstOrNull()
 
     fun appendRun(record: RunRecord) {

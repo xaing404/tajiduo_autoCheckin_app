@@ -223,12 +223,16 @@ class AttendanceService : Service() {
             val errors = EmailNotifier.send(settings.emailSender, settings.emailAuthCode, recipient, subject, content)
             if (errors.isEmpty()) {
                 Log.i(TAG, "email sent")
+                StateStore(this).recordEmailStatus("sign", shanghaiDate(), true, "")
             } else {
-                Log.e(TAG, "email send failed: ${errors.joinToString("; ")}")
+                val detail = errors.joinToString("; ")
+                Log.e(TAG, "email send failed: $detail")
+                StateStore(this).recordEmailStatus("sign", shanghaiDate(), false, detail)
             }
         }
         catch (error: Exception) {
             Log.e(TAG, "email send failed: ${error.message}")
+            StateStore(this).recordEmailStatus("sign", shanghaiDate(), false, error.message ?: "unknown")
         }
     }
 
@@ -256,12 +260,16 @@ class AttendanceService : Service() {
             val errors = EmailNotifier.send(settings.emailSender, settings.emailAuthCode, recipient, subject, content)
             if (errors.isEmpty()) {
                 Log.i(TAG, "check email sent")
+                StateStore(this).recordEmailStatus("check", shanghaiDate(), true, "")
             } else {
-                Log.e(TAG, "check email send failed: ${errors.joinToString("; ")}")
+                val detail = errors.joinToString("; ")
+                Log.e(TAG, "check email send failed: $detail")
+                StateStore(this).recordEmailStatus("check", shanghaiDate(), false, detail)
             }
         }
         catch (error: Exception) {
             Log.e(TAG, "check email send failed: ${error.message}")
+            StateStore(this).recordEmailStatus("check", shanghaiDate(), false, error.message ?: "unknown")
         }
     }
 
