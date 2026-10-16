@@ -130,6 +130,12 @@ class MainActivity : AppCompatActivity() {
         binding.rowSignTime.setOnClickListener { showTimePicker() }
         binding.rowTheme.setOnClickListener { showThemeDialog() }
         binding.rowSharePlatform.setOnClickListener { showPlatformDialog() }
+        // 高级设置折叠：默认收起，点 rowAdvanced 在 ▸/▾ 间切换
+        binding.rowAdvanced.setOnClickListener {
+            val expanded = binding.advancedContent.visibility == View.VISIBLE
+            binding.advancedContent.visibility = if (expanded) View.GONE else View.VISIBLE
+            binding.tvAdvancedArrow.text = if (expanded) "▸" else "▾"
+        }
 
         binding.switchCoinTasks.setOnCheckedChangeListener { _, value -> settings.coinTasks = value }
         binding.switchCloudDuration.setOnCheckedChangeListener { _, value -> settings.cloudDuration = value }
@@ -318,12 +324,19 @@ class MainActivity : AppCompatActivity() {
         val dayStatus = HashMap<String, String>() // day -> "ok"/"bad"
         val accSuccess = HashMap<String, MutableSet<String>>()
         val accName = HashMap<String, String>()
+        // runs 是新→旧（appendRun 插到索引 0）。月历按"当天最终结果"着色：
+        // 每天第一次遇到的 run 即最新一次运行，定色后不再被同天更早的老记录覆盖，
+        // 避免"今天最终成功但早先跑过失败"时整天被标红。
         for (run in runs) {
             val day = dayFmt.format(Date(run.finishedAt))
-            val hasFail = run.accounts.any { it.status == "failed" }
-            val hasOk = run.accounts.any { it.status == "success" }
-            if (hasFail) dayStatus[day] = "bad"
-            else if (hasOk && dayStatus[day] != "bad") dayStatus[day] = "ok"
+            if (!dayStatus.containsKey(day)) {
+                val hasFail = run.accounts.any { it.status == "failed" }
+                val hasOk = run.accounts.any { it.status == "success" }
+                when {
+                    hasFail -> dayStatus[day] = "bad"
+                    hasOk -> dayStatus[day] = "ok"
+                }
+            }
             for (acc in run.accounts) {
                 accName[acc.id] = acc.name
                 if (acc.status == "success") accSuccess.getOrPut(acc.id) { mutableSetOf() }.add(day)

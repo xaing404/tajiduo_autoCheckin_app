@@ -500,51 +500,91 @@
                         tools:text="qq" />
                 </LinearLayout>
 
-                <!-- 重试次数 -->
-                <TextView
-                    style="@style/SettingRowLabel"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    android:text="@string/setting_max_retries" />
-
-                <com.google.android.material.textfield.TextInputLayout
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                <!-- 高级设置折叠头：点击展开/收起下面的重试次数与 Webhook -->
+                <LinearLayout
+                    android:id="@+id/rowAdvanced"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/etMaxRetries"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:inputType="number"
-                        android:maxLength="2"
-                        tools:text="3" />
-                </com.google.android.material.textfield.TextInputLayout>
-
-                <!-- Webhook -->
-                <TextView
-                    style="@style/SettingRowLabel"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
-                    android:text="@string/setting_webhook" />
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="4dp">
 
-                <com.google.android.material.textfield.TextInputLayout
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    <TextView
+                        style="@style/SettingRowLabel"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/setting_advanced" />
+
+                    <TextView
+                        android:id="@+id/tvAdvancedArrow"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="sans-serif-medium"
+                        android:text="▸"
+                        android:textColor="@color/brand"
+                        android:textSize="16sp" />
+                </LinearLayout>
+
+                <!-- 高级设置内容：默认收起，点 rowAdvanced 展开 -->
+                <LinearLayout
+                    android:id="@+id/advancedContent"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    app:helperText="@string/setting_webhook_hint">
+                    android:orientation="vertical"
+                    android:visibility="gone">
 
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/etWebhook"
+                    <!-- 重试次数 -->
+                    <TextView
+                        style="@style/SettingRowLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:text="@string/setting_max_retries" />
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:inputType="textUri"
-                        tools:text="" />
-                </com.google.android.material.textfield.TextInputLayout>
+                        android:layout_marginTop="6dp">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etMaxRetries"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="number"
+                            android:maxLength="2"
+                            tools:text="3" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <!-- Webhook -->
+                    <TextView
+                        style="@style/SettingRowLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:text="@string/setting_webhook" />
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        app:helperText="@string/setting_webhook_hint">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etWebhook"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="textUri"
+                            tools:text="" />
+                    </com.google.android.material.textfield.TextInputLayout>
+                </LinearLayout>
 
                 <!-- 邮件通知（QQ 邮箱） -->
                 <TextView

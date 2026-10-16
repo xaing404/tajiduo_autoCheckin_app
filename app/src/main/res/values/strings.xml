@@ -37,6 +37,7 @@
     <string name="setting_max_retries">失败重试次数</string>
     <string name="setting_webhook">通知 Webhook（可选，逗号分隔）</string>
     <string name="setting_webhook_hint">留空则仅使用系统通知</string>
+    <string name="setting_advanced">高级设置</string>
     <string name="setting_email_section">邮件通知（QQ 邮箱）</string>
     <string name="setting_email_sender">发件 QQ 邮箱</string>
     <string name="setting_email_auth_code">SMTP 授权码</string>
