@@ -51,14 +51,42 @@ class AttendanceService : Service() {
         Log.i(TAG, "service start: force=$force killAfter=$killAfter checkReport=${checkReport != null}")
 
         val helper = NotificationHelper(this)
-        helper.ensureChannel()
-        ServiceCompat.startForeground(
-            this,
-            NotificationHelper.ONGOING_ID,
-            helper.buildOngoing(),
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
-        )
-        acquireWakeLock()
+        try {
+            helper.ensureChannel()
+            ServiceCompat.startForeground(
+                this,
+                NotificationHelper.ONGOING_ID,
+                helper.buildOngoing(),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
+            )
+            acquireWakeLock()
+        }
+        catch (startError: Exception) {
+            // 启动阶段失败（前台服务被 ROM 拒绝、通知通道异常、WakeLock 获取失败）：
+            // 这属于「签到失败」，必须发邮件提醒，不能静默吞掉。该异常在 scope.launch 之前，
+            // execute 的 catch 接不住，所以在这里独立补发失败邮件。
+            Log.e(TAG, "service start failed", startError)
+            val now = System.currentTimeMillis()
+            scope.launch {
+                val settings = SettingsStore(this@AttendanceService)
+                sendEmailSafe(
+                    settings = settings,
+                    summary = "签到服务启动失败：${startError.message ?: startError.javaClass.simpleName}",
+                    successCount = 0,
+                    failedCount = 1,
+                    skippedCount = 0,
+                    startedAt = now,
+                    finishedAt = now,
+                )
+                releaseWakeLock()
+                stopSelf()
+                if (killAfter && settings.killAfterRun) {
+                    Log.i(TAG, "kill process for power saving")
+                    android.os.Process.killProcess(android.os.Process.myPid())
+                }
+            }
+            return START_NOT_STICKY
+        }
 
         scope.launch {
             if (checkReport != null) {

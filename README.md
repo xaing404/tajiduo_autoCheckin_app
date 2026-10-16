@@ -32,10 +32,10 @@
 
 ## 安装
 
-下载 [dist/tajiduo-attendance-v1.4.1.apk](dist/tajiduo-attendance-v1.4.1.apk) 后：
+下载 [dist/tajiduo-attendance-v1.5.0.apk](dist/tajiduo-attendance-v1.5.0.apk) 后：
 
 ```bash
-adb install -r dist/tajiduo-attendance-v1.4.1.apk
+adb install -r dist/tajiduo-attendance-v1.5.0.apk
 ```
 
 或把 APK 传到手机点击安装。要求 **Android 8.0+**（minSdk 26），targetSdk 34。
@@ -209,6 +209,12 @@ app/src/main/java/com/tajiduo/attendance/
 ```
 
 ## 更新记录
+
+### v1.5.0
+
+- **签到失败也发送 QQ 邮件提醒**：账号签到失败、会话无法恢复、流程整体异常时，都会发送标题为「塔吉多签到 | 失败 | …」的邮件，邮箱列表一眼可见，不再只在成功时收到邮件。
+- **补齐服务启动阶段的失败盲区**：闹钟触发时若前台服务被 ROM 拒绝、通知通道异常或 WakeLock 获取失败（该异常发生在执行协程之前，原本无法被捕获），现在会独立补发一封失败邮件，避免应用静默失败、用户毫不知情。
+- 真机验证：构造全凭证失效场景，两个账号均失败（`failed sdk token 验证失败`），失败邮件正常送达。
 
 ### v1.4.1
 
