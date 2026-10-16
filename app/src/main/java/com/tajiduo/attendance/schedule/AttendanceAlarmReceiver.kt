@@ -30,6 +30,17 @@ class AttendanceAlarmReceiver : BroadcastReceiver() {
             checkAndRetrigger(context)
             return
         }
+        if (intent.action == AlarmScheduler.ACTION_MIDDAY_REMIND) {
+            checkAndMiddayRemind(context)
+            return
+        }
+        if (intent.action == AlarmScheduler.ACTION_WEEKLY_REPORT) {
+            ContextCompat.startForegroundService(
+                context,
+                com.tajiduo.attendance.service.AttendanceService.buildWeeklyReportIntent(context),
+            )
+            return
+        }
         ContextCompat.startForegroundService(
             context,
             AttendanceService.buildIntent(context, force = false, killAfter = true),
@@ -76,12 +87,57 @@ class AttendanceAlarmReceiver : BroadcastReceiver() {
             Log.w(TAG, "failsafe: ${unsigned.size}/${accounts.size} account(s) unsigned on $date, retrigger sign")
             ContextCompat.startForegroundService(
                 context,
-                AttendanceService.buildIntent(context, force = false, killAfter = true),
+                AttendanceService.buildIntent(context, force = false, killAfter = true, nightCheck = true),
             )
         }
         catch (error: Exception) {
             // 检查失败仅记录日志，不影响主流程
             Log.e(TAG, "failsafe check failed", error)
+        }
+    }
+
+    /**
+     * 中午 12:30 待补签提醒（一次性，仅早上失败后排过）：
+     * 再次核对当天状态，仍有账号未签才发一封「待补签」邮件+通知；
+     * 已签则静默（说明用户手动补了或后续成功）。不自动重跑签到，留给 23:30 兜底。
+     */
+    private fun checkAndMiddayRemind(context: Context) {
+        val accounts = try {
+            AccountStore(context).readAccounts()
+        }
+        catch (error: Exception) {
+            Log.i(TAG, "midday remind: accounts not configured, skip")
+            return
+        }
+        if (accounts.isEmpty()) {
+            Log.i(TAG, "midday remind: no accounts, skip")
+            return
+        }
+        try {
+            val state = StateStore(context)
+            val date = shanghaiDate()
+            val unsigned = accounts.filter { !state.isSignedToday(it.id, date) }
+            if (unsigned.isEmpty()) {
+                Log.i(TAG, "midday remind: all signed now, stay silent")
+                return
+            }
+            Log.i(TAG, "midday remind: ${unsigned.size}/${accounts.size} still unsigned, send reminder")
+            val summary = buildString {
+                appendLine("中午补签提醒：${unsigned.size}/${accounts.size} 个账号今日尚未签到成功。")
+                appendLine()
+                unsigned.forEach { account ->
+                    appendLine("- ${account.name}（${account.id}）：未签到")
+                }
+                appendLine()
+                appendLine("如已手动签到可忽略；今晚 23:30 会自动补签。")
+            }
+            ContextCompat.startForegroundService(
+                context,
+                AttendanceService.buildMiddayRemindIntent(context, summary),
+            )
+        }
+        catch (error: Exception) {
+            Log.e(TAG, "midday remind check failed", error)
         }
     }
 

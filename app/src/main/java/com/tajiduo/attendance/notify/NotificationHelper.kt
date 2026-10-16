@@ -24,6 +24,21 @@ class NotificationHelper(private val context: Context) {
             description = "塔吉多自动签到状态通知"
         }
         manager.createNotificationChannel(channel)
+        // 夜间失败提醒渠道：仅 23:30 补签最终失败时使用。
+        // HIGH = 横幅短暂弹出 + 默认提示音 + 短震动 + 锁屏可见内容；但不设置全屏 Intent，
+        // 因此只是“叮一下提醒你看一眼”，不是闹钟那种强制全屏打断。
+        val nightChannel = NotificationChannel(
+            CHANNEL_NIGHT_FAIL,
+            "夜间失败提醒",
+            NotificationManager.IMPORTANCE_HIGH,
+        ).apply {
+            description = "夜间补签确认失败时的提示音与锁屏提醒"
+            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            setSound(android.provider.Settings.System.DEFAULT_NOTIFICATION_URI, null)
+            enableVibration(true)
+            vibrationPattern = longArrayOf(0, 150, 100, 150)
+        }
+        manager.createNotificationChannel(nightChannel)
     }
 
     /** 构建进行中通知（前台服务必须无条件构建，不依赖通知权限）。 */
@@ -64,6 +79,25 @@ class NotificationHelper(private val context: Context) {
         notifyResult(message, success = false)
     }
 
+    /**
+     * 夜间补签最终失败提醒：用独立的 HIGH 重要性渠道，带提示音 + 短震动 + 锁屏可见原因。
+     * 仅在 23:30 夜间检查确认今天仍有账号未签成功时调用，与白天常规结果通知区分。
+     */
+    fun notifyNightFail(summary: String) {
+        if (!PermissionHelper.hasNotificationPermission(context)) return
+        val preview = summary.lineSequence().firstOrNull { it.isNotBlank() } ?: summary
+        val notification = NotificationCompat.Builder(context, CHANNEL_NIGHT_FAIL)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("塔吉多签到失败（夜间补签未成功）")
+            .setContentText(preview)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(summary))
+            .setAutoCancel(true)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setContentIntent(contentIntent())
+            .build()
+        notifyCompat(NIGHT_FAIL_ID, notification)
+    }
+
     /** 夜间检查结果通知（全部账号已签到，无需补签）。 */
     fun notifyFailsafeResult(summary: String) {
         if (!PermissionHelper.hasNotificationPermission(context)) return
@@ -71,6 +105,21 @@ class NotificationHelper(private val context: Context) {
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("塔吉多夜间检查完成")
+            .setContentText(preview)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(summary))
+            .setAutoCancel(true)
+            .setContentIntent(contentIntent())
+            .build()
+        notifyCompat(RESULT_ID, notification)
+    }
+
+    /** 中午 12:30 待补签提醒通知。 */
+    fun notifyMiddayRemind(summary: String) {
+        if (!PermissionHelper.hasNotificationPermission(context)) return
+        val preview = summary.lineSequence().firstOrNull { it.isNotBlank() } ?: summary
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("塔吉多待补签：今日仍有账号未签")
             .setContentText(preview)
             .setStyle(NotificationCompat.BigTextStyle().bigText(summary))
             .setAutoCancel(true)
@@ -102,7 +151,9 @@ class NotificationHelper(private val context: Context) {
 
     companion object {
         const val CHANNEL_ID = "attendance_status"
+        const val CHANNEL_NIGHT_FAIL = "night_fail_alert"
         const val ONGOING_ID = 1001
         const val RESULT_ID = 1002
+        const val NIGHT_FAIL_ID = 1003
     }
 }

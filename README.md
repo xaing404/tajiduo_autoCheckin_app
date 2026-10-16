@@ -32,10 +32,10 @@
 
 ## 安装
 
-下载 [dist/tajiduo-attendance-v1.5.0.apk](dist/tajiduo-attendance-v1.5.0.apk) 后：
+下载 [dist/tajiduo-attendance-v1.6.0.apk](dist/tajiduo-attendance-v1.6.0.apk) 后：
 
 ```bash
-adb install -r dist/tajiduo-attendance-v1.5.0.apk
+adb install -r dist/tajiduo-attendance-v1.6.0.apk
 ```
 
 或把 APK 传到手机点击安装。要求 **Android 8.0+**（minSdk 26），targetSdk 34。
@@ -209,6 +209,13 @@ app/src/main/java/com/tajiduo/attendance/
 ```
 
 ## 更新记录
+
+### v1.6.0
+
+- **每周签到周报邮件**：每周日 21:00 自动发送本周签到周报，统计本周成功/失败/未运行天数、各账号连续签到天数与本周失败记录，标题「塔吉多签到 | 周报 | …」。
+- **失败中午升级提醒**：早上 8 点主签到失败后，会一次性排一个今天 12:30 的提醒；到点若仍有账号未签，发送「待补签」邮件+通知，避免早上失败后被遗忘。
+- **夜间失败提示音**：23:30 补签最终仍失败时，新建独立通知渠道（heads-up 横幅 + 默认提示音 + 短震动 + 锁屏可见原因），不像闹铃那样强制全屏，只是提醒你看一眼。
+- **本月签到月历 + 连签天数**：首页新增「本月签到」卡片，绿=成功、红=失败、灰=未运行，并显示各账号连续签到天数。
 
 ### v1.5.0
 

@@ -26,6 +26,8 @@ object AlarmScheduler {
     private const val REQUEST_CODE_SHOW = 2002
     private const val REQUEST_CODE_FAILSAFE = 2003
     private const val REQUEST_CODE_DAY_RESET = 2004
+    private const val REQUEST_CODE_MIDDAY = 2005
+    private const val REQUEST_CODE_WEEKLY = 2006
     const val ACTION_ALARM = "com.tajiduo.attendance.action.ALARM"
     const val ACTION_FAILSAFE = "com.tajiduo.attendance.action.FAILSAFE"
 
@@ -33,6 +35,16 @@ object AlarmScheduler {
     const val ACTION_DAY_RESET = "com.tajiduo.attendance.action.DAY_RESET"
     private const val DAY_RESET_HOUR = 0
     private const val DAY_RESET_MINUTE = 0
+
+    /** 中午补签提醒：早上签到失败后一次性设置，今天 12:30 触发。 */
+    const val ACTION_MIDDAY_REMIND = "com.tajiduo.attendance.action.MIDDAY_REMIND"
+    private const val MIDDAY_REMIND_HOUR = 12
+    private const val MIDDAY_REMIND_MINUTE = 30
+
+    /** 每周签到周报：每周日 21:00 触发。 */
+    const val ACTION_WEEKLY_REPORT = "com.tajiduo.attendance.action.WEEKLY_REPORT"
+    private const val WEEKLY_HOUR = 21
+    private const val WEEKLY_MINUTE = 0
 
     fun scheduleNext(context: Context, hour: Int, minute: Int) {
         val manager = context.getSystemService(AlarmManager::class.java) ?: return
@@ -55,6 +67,7 @@ object AlarmScheduler {
         scheduleNext(context, settings.hour, settings.minute)
         scheduleFailsafe(context, settings.failsafeHour, settings.failsafeMinute)
         scheduleDayReset(context)
+        scheduleWeeklyReport(context)
     }
 
     /**
@@ -101,7 +114,77 @@ object AlarmScheduler {
         manager.cancel(pendingIntent(context))
         manager.cancel(failsafePendingIntent(context))
         manager.cancel(dayResetPendingIntent(context))
+        manager.cancel(middayRemindPendingIntent(context))
+        manager.cancel(weeklyReportPendingIntent(context))
         Log.i(TAG, "alarm cancelled")
+    }
+
+    /**
+     * 中午补签提醒（一次性，今天 12:30）：仅在早上主签到失败时调用。
+     * 到点后由 Receiver 再核对一次当天状态，仍未签才发提醒邮件；
+     * 若用户已手动签到或后续补签成功，则静默。一次性闹钟，触发即失效。
+     */
+    fun scheduleMiddayReminder(context: Context) {
+        val manager = context.getSystemService(AlarmManager::class.java) ?: return
+        val triggerAt = middayTriggerMillis()
+        if (triggerAt <= System.currentTimeMillis()) {
+            Log.i(TAG, "midday remind: already past, skip")
+            return
+        }
+        val pending = middayRemindPendingIntent(context)
+        try {
+            val info = AlarmManager.AlarmClockInfo(triggerAt, showIntent(context))
+            manager.setAlarmClock(info, pending)
+            Log.i(TAG, "midday remind scheduled: ${SimpleDateFormat("MM-dd HH:mm", Locale.US).format(Date(triggerAt))}")
+        }
+        catch (error: Exception) {
+            Log.w(TAG, "setAlarmClock failed for midday remind, fallback", error)
+            manager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pending)
+        }
+    }
+
+    /** 今天 12:30 的时间戳（已过则返回 0，调用方判断跳过）。 */
+    private fun middayTriggerMillis(): Long {
+        val target = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, MIDDAY_REMIND_HOUR)
+            set(Calendar.MINUTE, MIDDAY_REMIND_MINUTE)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        return if (target.timeInMillis <= System.currentTimeMillis()) 0 else target.timeInMillis
+    }
+
+    /** 每周日 21:00 周报闹钟。 */
+    fun scheduleWeeklyReport(context: Context) {
+        val manager = context.getSystemService(AlarmManager::class.java) ?: return
+        val triggerAt = weeklyTriggerMillis()
+        val pending = weeklyReportPendingIntent(context)
+        try {
+            val info = AlarmManager.AlarmClockInfo(triggerAt, showIntent(context))
+            manager.setAlarmClock(info, pending)
+            Log.i(TAG, "weekly report scheduled: ${SimpleDateFormat("MM-dd HH:mm", Locale.US).format(Date(triggerAt))}")
+        }
+        catch (error: Exception) {
+            Log.w(TAG, "setAlarmClock failed for weekly report, fallback", error)
+            manager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pending)
+        }
+    }
+
+    /** 下一个周日 21:00 的时间戳。 */
+    private fun weeklyTriggerMillis(): Long {
+        val target = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, WEEKLY_HOUR)
+            set(Calendar.MINUTE, WEEKLY_MINUTE)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        // Calendar.DAY_OF_WEEK: 周日=1, 周一=2 ... 周六=7
+        val daysUntilSunday = (8 - target.get(Calendar.DAY_OF_WEEK)) % 7
+        target.add(Calendar.DAY_OF_YEAR, daysUntilSunday)
+        if (target.timeInMillis <= System.currentTimeMillis()) {
+            target.add(Calendar.DAY_OF_YEAR, 7)
+        }
+        return target.timeInMillis
     }
 
     /** 下一次触发时间戳：今天未到则今天，否则明天。 */
@@ -152,6 +235,30 @@ object AlarmScheduler {
         return PendingIntent.getBroadcast(
             context,
             REQUEST_CODE_DAY_RESET,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
+
+    private fun middayRemindPendingIntent(context: Context): PendingIntent {
+        val intent = Intent(context, AttendanceAlarmReceiver::class.java).apply {
+            action = ACTION_MIDDAY_REMIND
+        }
+        return PendingIntent.getBroadcast(
+            context,
+            REQUEST_CODE_MIDDAY,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
+
+    private fun weeklyReportPendingIntent(context: Context): PendingIntent {
+        val intent = Intent(context, AttendanceAlarmReceiver::class.java).apply {
+            action = ACTION_WEEKLY_REPORT
+        }
+        return PendingIntent.getBroadcast(
+            context,
+            REQUEST_CODE_WEEKLY,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )

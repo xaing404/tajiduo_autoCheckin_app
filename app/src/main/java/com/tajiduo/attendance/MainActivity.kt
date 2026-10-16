@@ -37,6 +37,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
@@ -177,6 +178,7 @@ class MainActivity : AppCompatActivity() {
         updateDetail()
         updateAccount()
         updateHistory()
+        updateCalendar()
     }
 
     private fun updateNextRun() {
@@ -295,6 +297,103 @@ class MainActivity : AppCompatActivity() {
                 .setPositiveButton(getString(R.string.dialog_close), null)
                 .show()
         }
+    }
+
+    /** 渲染本月签到月历 + 各账号连续签到天数。数据源 runs.json（最近 30 条）。 */
+    private fun updateCalendar() {
+        val runs = stateStore.loadRuns()
+        val zone = TimeZone.getTimeZone("Asia/Shanghai")
+        val dayFmt = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply { timeZone = zone }
+        val now = Calendar.getInstance(zone)
+        val year = now.get(Calendar.YEAR)
+        val month = now.get(Calendar.MONTH)
+        val todayDay = now.get(Calendar.DAY_OF_MONTH)
+
+        val dayStatus = HashMap<String, String>() // day -> "ok"/"bad"
+        val accSuccess = HashMap<String, MutableSet<String>>()
+        val accName = HashMap<String, String>()
+        for (run in runs) {
+            val day = dayFmt.format(Date(run.finishedAt))
+            val hasFail = run.accounts.any { it.status == "failed" }
+            val hasOk = run.accounts.any { it.status == "success" }
+            if (hasFail) dayStatus[day] = "bad"
+            else if (hasOk && dayStatus[day] != "bad") dayStatus[day] = "ok"
+            for (acc in run.accounts) {
+                accName[acc.id] = acc.name
+                if (acc.status == "success") accSuccess.getOrPut(acc.id) { mutableSetOf() }.add(day)
+            }
+        }
+
+        // 连签天数
+        val streakLines = accSuccess.map { (id, days) ->
+            var s = 0
+            val c = Calendar.getInstance(zone)
+            while (true) {
+                val d = dayFmt.format(c.time)
+                if (days.contains(d)) s++ else break
+                c.add(Calendar.DAY_OF_YEAR, -1)
+                if (s > 366) break
+            }
+            "${accName[id] ?: id}：连续 $s 天"
+        }
+        binding.tvStreak.text = streakLines.ifEmpty { listOf("暂无签到记录") }.joinToString("　")
+
+        // 填月历
+        binding.gridCalendar.removeAllViews()
+        val dp = resources.displayMetrics.density
+        val headers = arrayOf("日", "一", "二", "三", "四", "五", "六")
+        for (h in headers) addCalendarCell(h, dp, header = true)
+        val firstCal = Calendar.getInstance(zone).apply {
+            set(Calendar.YEAR, year); set(Calendar.MONTH, month); set(Calendar.DAY_OF_MONTH, 1)
+        }
+        val offset = firstCal.get(Calendar.DAY_OF_WEEK) - 1
+        repeat(offset) { addCalendarCell("", dp) }
+        val daysInMonth = firstCal.getActualMaximum(Calendar.DAY_OF_MONTH)
+        for (d in 1..daysInMonth) {
+            val dayStr = String.format(Locale.US, "%04d-%02d-%02d", year, month + 1, d)
+            addCalendarCell(d.toString(), dp, status = dayStatus[dayStr], isToday = d == todayDay)
+        }
+    }
+
+    private fun addCalendarCell(
+        text: String,
+        dp: Float,
+        header: Boolean = false,
+        status: String? = null,
+        isToday: Boolean = false,
+    ) {
+        val size = (36 * dp).toInt()
+        val tv = android.widget.TextView(this).apply {
+            this.text = text
+            textSize = if (header) 12f else 13f
+            gravity = android.view.Gravity.CENTER
+            layoutParams = android.widget.GridLayout.LayoutParams().apply {
+                width = size
+                height = size
+                setMargins(2, 2, 2, 2)
+            }
+        }
+        when {
+            header -> {
+                tv.setTextColor(ContextCompat.getColor(this, R.color.text_secondary))
+            }
+            status == "ok" -> {
+                tv.setBackgroundColor(ContextCompat.getColor(this, R.color.state_ok))
+                tv.setTextColor(android.graphics.Color.WHITE)
+            }
+            status == "bad" -> {
+                tv.setBackgroundColor(ContextCompat.getColor(this, R.color.state_bad))
+                tv.setTextColor(android.graphics.Color.WHITE)
+            }
+            isToday -> {
+                tv.setBackgroundResource(android.R.drawable.dialog_holo_light_frame)
+                tv.setTextColor(ContextCompat.getColor(this, R.color.brand))
+            }
+            else -> {
+                tv.setTextColor(ContextCompat.getColor(this, R.color.text_secondary))
+            }
+        }
+        binding.gridCalendar.addView(tv)
     }
 
     private fun setRunning(running: Boolean) {

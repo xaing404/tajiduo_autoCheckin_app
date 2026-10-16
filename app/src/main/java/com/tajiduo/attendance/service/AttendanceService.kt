@@ -37,6 +37,7 @@ class AttendanceService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var wakeLock: PowerManager.WakeLock? = null
     private var running = false
+    private var nightCheckRun = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -47,7 +48,10 @@ class AttendanceService : Service() {
         running = true
         val force = intent?.getBooleanExtra(EXTRA_FORCE, false) ?: false
         val killAfter = intent?.getBooleanExtra(EXTRA_KILL_AFTER, false) ?: false
+        nightCheckRun = intent?.getBooleanExtra(EXTRA_NIGHT_CHECK, false) ?: false
         val checkReport = intent?.getStringExtra(EXTRA_CHECK_REPORT)
+        val middayRemind = intent?.getStringExtra(EXTRA_MIDDAY_REMIND)
+        val weeklyReport = intent?.getStringExtra(EXTRA_WEEKLY_REPORT)
         Log.i(TAG, "service start: force=$force killAfter=$killAfter checkReport=${checkReport != null}")
 
         val helper = NotificationHelper(this)
@@ -89,10 +93,11 @@ class AttendanceService : Service() {
         }
 
         scope.launch {
-            if (checkReport != null) {
-                runCheckReport(checkReport, killAfter)
-            } else {
-                execute(force, killAfter)
+            when {
+                checkReport != null -> runCheckReport(checkReport, killAfter)
+                middayRemind != null -> runMiddayRemind(middayRemind, killAfter)
+                weeklyReport != null -> runWeeklyReport(killAfter)
+                else -> execute(force, killAfter)
             }
         }
         return START_NOT_STICKY
@@ -131,6 +136,16 @@ class AttendanceService : Service() {
             if (settings.notifyEnabled) {
                 NotificationHelper(this).notifyResult(summary, success)
             }
+            if (!success && nightCheckRun) {
+                // 夜间 23:30 补签最终仍有账号失败：发带提示音 + 锁屏可见原因的醒目提醒
+                Log.i(TAG, "night check failed, alert with sound")
+                NotificationHelper(this).notifyNightFail(summary)
+            }
+            if (!success && !nightCheckRun) {
+                // 早上主签到失败：排一个今天 12:30 的待补签提醒（到点 Receiver 再核对状态）
+                com.tajiduo.attendance.schedule.AlarmScheduler.scheduleMiddayReminder(this)
+                Log.i(TAG, "midday remind scheduled due to morning failure")
+            }
             sendWebhook(settings, summary)
             sendEmailSafe(
                 settings = settings,
@@ -151,6 +166,10 @@ class AttendanceService : Service() {
             }
             catch (_: Exception) {
                 // 忽略通知失败
+            }
+            if (nightCheckRun) {
+                // 夜间补签流程整体异常：同样发提示音提醒
+                NotificationHelper(this).notifyNightFail(summary)
             }
             sendEmailSafe(
                 settings = settings,
@@ -189,6 +208,58 @@ class AttendanceService : Service() {
         }
         catch (error: Exception) {
             Log.e(TAG, "check report failed", error)
+        }
+        finally {
+            releaseWakeLock()
+            ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+            stopSelf()
+            if (killAfter && settings.killAfterRun) {
+                Log.i(TAG, "kill process for power saving")
+                android.os.Process.killProcess(android.os.Process.myPid())
+            }
+        }
+    }
+
+    /**
+     * 中午 12:30 待补签提醒：早上失败后排的一次性闹钟，到点仍有未签才触发。
+     * 只发通知与邮件提醒，不自动补签（留给 23:30 兜底）。
+     */
+    private fun runMiddayRemind(summary: String, killAfter: Boolean) {
+        val settings = SettingsStore(this)
+        try {
+            Log.i(TAG, "midday remind: send notification=${settings.notifyEnabled}")
+            if (settings.notifyEnabled) {
+                NotificationHelper(this).notifyMiddayRemind(summary)
+            }
+            sendMiddayEmailSafe(settings, summary)
+        }
+        catch (error: Exception) {
+            Log.e(TAG, "midday remind failed", error)
+        }
+        finally {
+            releaseWakeLock()
+            ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+            stopSelf()
+            if (killAfter && settings.killAfterRun) {
+                Log.i(TAG, "kill process for power saving")
+                android.os.Process.killProcess(android.os.Process.myPid())
+            }
+        }
+    }
+
+    /**
+     * 每周日 21:00 周报邮件：读 runs.json 统计本周表现与连续签到天数。
+     */
+    private fun runWeeklyReport(killAfter: Boolean) {
+        val settings = SettingsStore(this)
+        try {
+            val state = StateStore(this)
+            val report = com.tajiduo.attendance.notify.WeeklyReportBuilder.build(state)
+            Log.i(TAG, "weekly report generated, ${report.length} chars")
+            sendWeeklyEmailSafe(settings, report)
+        }
+        catch (error: Exception) {
+            Log.e(TAG, "weekly report failed", error)
         }
         finally {
             releaseWakeLock()
@@ -304,6 +375,66 @@ class AttendanceService : Service() {
         }
     }
 
+    /** 中午待补签提醒邮件：早上失败后 12:30 仍未签时发送，提醒用户手动补签。 */
+    private fun sendMiddayEmailSafe(settings: SettingsStore, summary: String) {
+        if (!settings.emailConfigured) return
+        val recipient = settings.emailRecipient.ifBlank { settings.emailSender }
+        val now = System.currentTimeMillis()
+        val subject = "塔吉多签到 | 待补签 | ${formatShortTime(now)} | 电量：${batteryPercentText()}"
+        val content = buildString {
+            appendLine("塔吉多待补签提醒（自动发送）")
+            appendLine()
+            appendLine("提醒时间：${formatEmailTime(now, withSeconds = true)}")
+            appendLine("说明：今日早上签到后，仍有账号未完成签到。")
+            appendLine(DeviceStatus.batteryLine(this@AttendanceService))
+            appendLine()
+            appendLine("——————————")
+            appendLine(summary)
+            appendLine("——————————")
+            append("本邮件由「塔吉多签到」App 自动发送，请勿直接回复。")
+        }
+        try {
+            val errors = EmailNotifier.send(settings.emailSender, settings.emailAuthCode, recipient, subject, content)
+            if (errors.isEmpty()) {
+                Log.i(TAG, "midday remind email sent")
+            } else {
+                Log.e(TAG, "midday remind email send failed: ${errors.joinToString("; ")}")
+            }
+        }
+        catch (error: Exception) {
+            Log.e(TAG, "midday remind email send failed: ${error.message}")
+        }
+    }
+
+    /** 每周周报邮件：标题「塔吉多签到 | 周报 | MM-dd HH:mm | 电量：xx%」。 */
+    private fun sendWeeklyEmailSafe(settings: SettingsStore, report: String) {
+        if (!settings.emailConfigured) return
+        val recipient = settings.emailRecipient.ifBlank { settings.emailSender }
+        val now = System.currentTimeMillis()
+        val subject = "塔吉多签到 | 周报 | ${formatShortTime(now)} | 电量：${batteryPercentText()}"
+        val content = buildString {
+            appendLine("塔吉多签到周报（自动发送）")
+            appendLine()
+            appendLine(DeviceStatus.batteryLine(this@AttendanceService))
+            appendLine()
+            appendLine("——————————")
+            appendLine(report)
+            appendLine("——————————")
+            append("本邮件由「塔吉多签到」App 自动发送，请勿直接回复。")
+        }
+        try {
+            val errors = EmailNotifier.send(settings.emailSender, settings.emailAuthCode, recipient, subject, content)
+            if (errors.isEmpty()) {
+                Log.i(TAG, "weekly report email sent")
+            } else {
+                Log.e(TAG, "weekly report email send failed: ${errors.joinToString("; ")}")
+            }
+        }
+        catch (error: Exception) {
+            Log.e(TAG, "weekly report email send failed: ${error.message}")
+        }
+    }
+
     private fun formatEmailTime(timestamp: Long, withSeconds: Boolean = false): String =
         SimpleDateFormat(if (withSeconds) "yyyy-MM-dd HH:mm:ss" else "yyyy-MM-dd HH:mm", Locale.US)
             .apply { timeZone = TimeZone.getTimeZone("Asia/Shanghai") }
@@ -359,20 +490,39 @@ class AttendanceService : Service() {
 
         /** 非空时进入"夜间检查报告"模式：仅发送通知与邮件，不执行签到。 */
         const val EXTRA_CHECK_REPORT = "check_report"
+        /** 非空时进入"中午待补签提醒"模式：仅发送提醒通知与邮件，不执行签到。 */
+        const val EXTRA_MIDDAY_REMIND = "midday_remind"
+        /** 非空时进入"每周周报"模式：仅发送周报邮件，不执行签到。 */
+        const val EXTRA_WEEKLY_REPORT = "weekly_report"
+        /** true 表示本次由 23:30 夜间补签触发；最终失败时发带提示音的锁屏提醒。 */
+        const val EXTRA_NIGHT_CHECK = "night_check"
         const val ACTION_RUN_FINISHED = "com.tajiduo.attendance.action.RUN_FINISHED"
         const val EXTRA_SUMMARY = "summary"
         const val EXTRA_SUCCESS = "success"
 
-        fun buildIntent(context: Context, force: Boolean, killAfter: Boolean): Intent =
+        fun buildIntent(context: Context, force: Boolean, killAfter: Boolean, nightCheck: Boolean = false): Intent =
             Intent(context, AttendanceService::class.java).apply {
                 putExtra(EXTRA_FORCE, force)
                 putExtra(EXTRA_KILL_AFTER, killAfter)
+                putExtra(EXTRA_NIGHT_CHECK, nightCheck)
             }
 
         fun buildCheckReportIntent(context: Context, summary: String): Intent =
             Intent(context, AttendanceService::class.java).apply {
                 putExtra(EXTRA_KILL_AFTER, true)
                 putExtra(EXTRA_CHECK_REPORT, summary)
+            }
+
+        fun buildMiddayRemindIntent(context: Context, summary: String): Intent =
+            Intent(context, AttendanceService::class.java).apply {
+                putExtra(EXTRA_KILL_AFTER, true)
+                putExtra(EXTRA_MIDDAY_REMIND, summary)
+            }
+
+        fun buildWeeklyReportIntent(context: Context): Intent =
+            Intent(context, AttendanceService::class.java).apply {
+                putExtra(EXTRA_KILL_AFTER, true)
+                putExtra(EXTRA_WEEKLY_REPORT, "1")
             }
     }
 }
