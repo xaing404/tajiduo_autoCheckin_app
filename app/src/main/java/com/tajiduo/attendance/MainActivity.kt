@@ -136,6 +136,12 @@ class MainActivity : AppCompatActivity() {
             binding.advancedContent.visibility = if (expanded) View.GONE else View.VISIBLE
             binding.tvAdvancedArrow.text = if (expanded) "▸" else "▾"
         }
+        // 邮件通知折叠：默认收起，点 rowEmail 在 ▸/▾ 间切换
+        binding.rowEmail.setOnClickListener {
+            val expanded = binding.emailContent.visibility == View.VISIBLE
+            binding.emailContent.visibility = if (expanded) View.GONE else View.VISIBLE
+            binding.tvEmailArrow.text = if (expanded) "▸" else "▾"
+        }
 
         binding.switchCoinTasks.setOnCheckedChangeListener { _, value -> settings.coinTasks = value }
         binding.switchCloudDuration.setOnCheckedChangeListener { _, value -> settings.cloudDuration = value }

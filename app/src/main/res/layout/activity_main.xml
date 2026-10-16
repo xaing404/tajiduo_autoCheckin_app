@@ -586,58 +586,90 @@
                     </com.google.android.material.textfield.TextInputLayout>
                 </LinearLayout>
 
-                <!-- 邮件通知（QQ 邮箱） -->
-                <TextView
-                    style="@style/SettingRowLabel"
-                    android:layout_width="wrap_content"
+                <!-- 邮件通知折叠头：默认收起，点开才显示三个邮箱输入框 -->
+                <LinearLayout
+                    android:id="@+id/rowEmail"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
-                    android:text="@string/setting_email_section" />
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="4dp">
 
-                <com.google.android.material.textfield.TextInputLayout
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    <TextView
+                        style="@style/SettingRowLabel"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/setting_email_section" />
+
+                    <TextView
+                        android:id="@+id/tvEmailArrow"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="sans-serif-medium"
+                        android:text="▸"
+                        android:textColor="@color/brand"
+                        android:textSize="16sp" />
+                </LinearLayout>
+
+                <!-- 邮件通知内容：默认收起 -->
+                <LinearLayout
+                    android:id="@+id/emailContent"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    app:helperText="@string/setting_email_sender_hint">
+                    android:orientation="vertical"
+                    android:visibility="gone">
 
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/etEmailSender"
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:inputType="textEmailAddress"
-                        tools:text="" />
-                </com.google.android.material.textfield.TextInputLayout>
+                        android:layout_marginTop="6dp"
+                        app:helperText="@string/setting_email_sender_hint">
 
-                <com.google.android.material.textfield.TextInputLayout
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    app:helperText="@string/setting_email_auth_code_hint">
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etEmailSender"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="textEmailAddress"
+                            tools:text="" />
+                    </com.google.android.material.textfield.TextInputLayout>
 
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/etEmailAuthCode"
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:inputType="textPassword"
-                        tools:text="" />
-                </com.google.android.material.textfield.TextInputLayout>
+                        android:layout_marginTop="6dp"
+                        app:helperText="@string/setting_email_auth_code_hint">
 
-                <com.google.android.material.textfield.TextInputLayout
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    app:helperText="@string/setting_email_recipient_hint">
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etEmailAuthCode"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="textPassword"
+                            tools:text="" />
+                    </com.google.android.material.textfield.TextInputLayout>
 
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/etEmailRecipient"
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:inputType="textEmailAddress"
-                        tools:text="" />
-                </com.google.android.material.textfield.TextInputLayout>
+                        android:layout_marginTop="6dp"
+                        app:helperText="@string/setting_email_recipient_hint">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etEmailRecipient"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="textEmailAddress"
+                            tools:text="" />
+                    </com.google.android.material.textfield.TextInputLayout>
+                </LinearLayout>
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnSaveSettings"
