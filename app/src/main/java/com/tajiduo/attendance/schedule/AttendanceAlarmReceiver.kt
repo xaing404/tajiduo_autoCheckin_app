@@ -19,6 +19,13 @@ class AttendanceAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         Log.i(TAG, "alarm fired at ${System.currentTimeMillis()}: ${intent.action}")
         AlarmScheduler.scheduleFromSettings(context)
+        if (intent.action == AlarmScheduler.ACTION_DAY_RESET) {
+            // 跨日重置：仅通知前台界面把「今日状态」刷新为未签到，不启动签到服务、不发通知邮件。
+            // 若 App 未在前台，广播无人接收也无副作用，下次打开时会按当天日期重新判定。
+            val tick = Intent(ACTION_DAY_RESET_TICK).setPackage(context.packageName)
+            context.sendBroadcast(tick)
+            return
+        }
         if (intent.action == AlarmScheduler.ACTION_FAILSAFE) {
             checkAndRetrigger(context)
             return
@@ -84,7 +91,10 @@ class AttendanceAlarmReceiver : BroadcastReceiver() {
             .apply { timeZone = TimeZone.getTimeZone("Asia/Shanghai") }
             .format(Date())
 
-    private companion object {
-        const val TAG = "TajiduoAttendance"
+    companion object {
+        private const val TAG = "TajiduoAttendance"
+
+        /** 跨日重置内部广播：仅在 App 前台时由 MainActivity 动态注册接收并刷新界面。 */
+        const val ACTION_DAY_RESET_TICK = "com.tajiduo.attendance.action.DAY_RESET_TICK"
     }
 }

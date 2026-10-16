@@ -11,6 +11,7 @@ import androidx.core.app.ServiceCompat
 import com.tajiduo.attendance.data.AccountStore
 import com.tajiduo.attendance.data.SettingsStore
 import com.tajiduo.attendance.data.StateStore
+import com.tajiduo.attendance.notify.DeviceStatus
 import com.tajiduo.attendance.notify.EmailNotifier
 import com.tajiduo.attendance.notify.NotificationHelper
 import com.tajiduo.attendance.notify.NotifyWebhook
@@ -206,13 +207,14 @@ class AttendanceService : Service() {
             successCount > 0 -> "成功"
             else -> "跳过"
         }
-        val subject = "塔吉多签到 | $status | ${formatEmailTime(startedAt)}"
+        val subject = "塔吉多签到 | $status | ${formatShortTime(startedAt)} | 电量：${batteryPercentText()}"
         val content = buildString {
             appendLine("塔吉多每日签到结果（自动发送）")
             appendLine()
             appendLine("签到开始：${formatEmailTime(startedAt, withSeconds = true)}")
             appendLine("签到结束：${formatEmailTime(finishedAt, withSeconds = true)}")
             appendLine("结果状态：$status（成功 $successCount / 失败 $failedCount / 跳过 $skippedCount）")
+            appendLine(DeviceStatus.batteryLine(this@AttendanceService))
             appendLine()
             appendLine("——————————")
             appendLine(summary)
@@ -244,12 +246,13 @@ class AttendanceService : Service() {
         if (!settings.emailConfigured) return
         val recipient = settings.emailRecipient.ifBlank { settings.emailSender }
         val now = System.currentTimeMillis()
-        val subject = "塔吉多签到 | 夜间检查·全部已签 | ${formatEmailTime(now)}"
+        val subject = "塔吉多签到 | 夜间检查·全部已签 | ${formatShortTime(now)} | 电量：${batteryPercentText()}"
         val content = buildString {
             appendLine("塔吉多夜间签到检查（自动发送）")
             appendLine()
             appendLine("检查时间：${formatEmailTime(now, withSeconds = true)}")
             appendLine("检查结果：全部账号今日已签到，无需补签")
+            appendLine(DeviceStatus.batteryLine(this@AttendanceService))
             appendLine()
             appendLine("——————————")
             appendLine(summary)
@@ -277,6 +280,18 @@ class AttendanceService : Service() {
         SimpleDateFormat(if (withSeconds) "yyyy-MM-dd HH:mm:ss" else "yyyy-MM-dd HH:mm", Locale.US)
             .apply { timeZone = TimeZone.getTimeZone("Asia/Shanghai") }
             .format(Date(timestamp))
+
+    /** 邮件标题用的短时间（MM-dd HH:mm，上海时区），避免标题过长在邮箱列表被截断。 */
+    private fun formatShortTime(timestamp: Long): String =
+        SimpleDateFormat("MM-dd HH:mm", Locale.US)
+            .apply { timeZone = TimeZone.getTimeZone("Asia/Shanghai") }
+            .format(Date(timestamp))
+
+    /** 邮件标题用的电量百分比文本，读不到时显示「未知」。 */
+    private fun batteryPercentText(): String {
+        val percent = DeviceStatus.battery(this).percent
+        return if (percent >= 0) "$percent%" else "未知"
+    }
 
     private fun broadcastFinished(summary: String, success: Boolean) {
         val intent = Intent(ACTION_RUN_FINISHED).apply {

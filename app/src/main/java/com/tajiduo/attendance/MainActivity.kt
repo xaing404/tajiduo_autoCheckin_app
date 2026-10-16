@@ -27,6 +27,7 @@ import com.tajiduo.attendance.login.LoginManager
 import com.tajiduo.attendance.notify.NotificationHelper
 import com.tajiduo.attendance.permission.PermissionHelper
 import com.tajiduo.attendance.schedule.AlarmScheduler
+import com.tajiduo.attendance.schedule.AttendanceAlarmReceiver
 import com.tajiduo.attendance.service.AttendanceService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -78,7 +79,11 @@ class MainActivity : AppCompatActivity() {
         ContextCompat.registerReceiver(
             this,
             runFinishedReceiver,
-            IntentFilter(AttendanceService.ACTION_RUN_FINISHED),
+            IntentFilter().apply {
+                addAction(AttendanceService.ACTION_RUN_FINISHED)
+                // 跨日重置闹钟（00:00）触发时刷新首页今日状态
+                addAction(AttendanceAlarmReceiver.ACTION_DAY_RESET_TICK)
+            },
             ContextCompat.RECEIVER_NOT_EXPORTED,
         )
         maybeRequestNotificationPermission()
@@ -190,6 +195,14 @@ class MainActivity : AppCompatActivity() {
             binding.viewStatusDot.backgroundTintList = ContextCompat.getColorStateList(this, R.color.state_unknown)
             binding.tvStatus.text = getString(R.string.status_unknown)
             binding.tvStatusTime.visibility = android.view.View.GONE
+            return
+        }
+        // 已跨日：最新一条运行记录不属于今天，则今日尚未签到（昨天的成功不延续到今天）。
+        if (shanghaiDate(record.finishedAt) != shanghaiDate(System.currentTimeMillis())) {
+            binding.viewStatusDot.backgroundTintList = ContextCompat.getColorStateList(this, R.color.state_warn)
+            binding.tvStatus.text = getString(R.string.status_unsigned_today)
+            binding.tvStatusTime.text = "最近运行：${formatDateTime(record.finishedAt)}"
+            binding.tvStatusTime.visibility = android.view.View.VISIBLE
             return
         }
         val (labelRes, colorRes) = when {
@@ -466,6 +479,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun formatDateTime(timestamp: Long): String =
         SimpleDateFormat("MM-dd HH:mm", Locale.CHINA)
+            .apply { timeZone = TimeZone.getTimeZone("Asia/Shanghai") }
+            .format(Date(timestamp))
+
+    /** 当天日期（Asia/Shanghai，yyyy-MM-dd），与去重键、闹钟判断口径保持一致。 */
+    private fun shanghaiDate(timestamp: Long): String =
+        SimpleDateFormat("yyyy-MM-dd", Locale.US)
             .apply { timeZone = TimeZone.getTimeZone("Asia/Shanghai") }
             .format(Date(timestamp))
 

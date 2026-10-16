@@ -11,8 +11,8 @@ android {
         applicationId = "com.tajiduo.attendance"
         minSdk = 26
         targetSdk = 34
-        versionCode = 8
-        versionName = "1.3.2"
+        versionCode = 10
+        versionName = "1.4.1"
     }
 
     buildTypes {

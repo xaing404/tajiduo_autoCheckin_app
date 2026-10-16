@@ -8,6 +8,7 @@
     <string name="status_success">签到成功</string>
     <string name="status_failed">签到失败</string>
     <string name="status_skipped">今日已跳过</string>
+    <string name="status_unsigned_today">今日未签到</string>
     <string name="status_running">正在签到…</string>
     <string name="btn_sign_now">立即签到</string>
     <string name="btn_permission">权限引导</string>
