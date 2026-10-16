@@ -70,6 +70,13 @@ class SettingsStore(context: Context) {
     val emailConfigured: Boolean
         get() = emailSender.isNotBlank() && emailAuthCode.isNotBlank()
 
+    // ---------------- 外观 ----------------
+
+    /** 主题模式：0=跟随系统，1=浅色，2=深色。 */
+    var themeMode: Int
+        get() = prefs.getInt("theme_mode", 0)
+        set(value) = prefs.edit().putInt("theme_mode", value).apply()
+
     // ---------------- 夜间补签检查 ----------------
 
     /** 夜间检查时间（默认 23:30）：当天未签到成功则重新触发一次签到。 */

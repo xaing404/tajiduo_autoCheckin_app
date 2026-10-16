@@ -1,23 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="brand">#1B7F4B</color>
-    <color name="brand_dark">#0F5132</color>
+    <!-- 品牌 -->
+    <color name="brand">#16803C</color>
+    <color name="brand_dark">#0E5E2B</color>
+    <color name="on_primary">#FFFFFF</color>
     <color name="ic_launcher_background">#A22B3E</color>
 
-    <color name="bg_page">#F5F6F8</color>
+    <!-- 背景 / 卡片 -->
+    <color name="bg_page">#F4F6F5</color>
     <color name="bg_card">#FFFFFF</color>
-    <color name="divider">#E7E9ED</color>
+    <color name="divider">#E8EBED</color>
+    <!-- 卡片描边（深色模式下用浅色描边替代阴影） -->
+    <color name="card_stroke">#EDEFF1</color>
 
-    <color name="text_primary">#1F2328</color>
-    <color name="text_secondary">#5B6470</color>
-    <color name="text_muted">#6B7280</color>
+    <!-- 文字 -->
+    <color name="text_primary">#191D21</color>
+    <color name="text_secondary">#5C6571</color>
+    <color name="text_muted">#8B93A0</color>
 
-    <color name="state_unknown">#9AA0A6</color>
-    <color name="state_ok">#2E7D32</color>
-    <color name="state_warn">#EF6C00</color>
-    <color name="state_bad">#C62828</color>
+    <!-- 状态色 -->
+    <color name="state_unknown">#9AA1AC</color>
+    <color name="state_ok">#18A34C</color>
+    <color name="state_warn">#F08A0E</color>
+    <color name="state_bad">#E0392C</color>
 
-    <color name="status_ok">#2E7D32</color>
-    <color name="status_warn">#EF6C00</color>
-    <color name="status_bad">#C62828</color>
+    <!-- 兼容别名（与 state 一致） -->
+    <color name="status_ok">#18A34C</color>
+    <color name="status_warn">#F08A0E</color>
+    <color name="status_bad">#E0392C</color>
 </resources>

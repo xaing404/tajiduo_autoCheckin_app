@@ -32,10 +32,10 @@
 
 ## 安装
 
-下载 [dist/tajiduo-attendance-v1.6.0.apk](dist/tajiduo-attendance-v1.6.0.apk) 后：
+下载 [dist/tajiduo-attendance-v1.7.0.apk](dist/tajiduo-attendance-v1.7.0.apk) 后：
 
 ```bash
-adb install -r dist/tajiduo-attendance-v1.6.0.apk
+adb install -r dist/tajiduo-attendance-v1.7.0.apk
 ```
 
 或把 APK 传到手机点击安装。要求 **Android 8.0+**（minSdk 26），targetSdk 34。
@@ -209,6 +209,12 @@ app/src/main/java/com/tajiduo/attendance/
 ```
 
 ## 更新记录
+
+### v1.7.0
+
+- **新增深色模式（黑夜模式）**：设置里「主题模式」可切换「跟随系统 / 浅色 / 深色」，深色下深灰底 + 亮绿点缀，晚上不刺眼，切换即时生效。
+- **界面整体更简洁清爽**：统一卡片圆角与淡描边（浅色/深色都靠描边勾勒层次）、月历格子改为圆角、沉浸式状态栏与导航栏、统一配色与间距。
+- 真机验证：浅色与深色两套配色均在 ColorOS 上实测，按钮、月历、状态卡、文字对比清晰。
 
 ### v1.6.0
 

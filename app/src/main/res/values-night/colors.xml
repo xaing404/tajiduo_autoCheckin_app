@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 品牌（深色下提亮，保持醒目） -->
+    <color name="brand">#34C873</color>
+    <color name="brand_dark">#1E7A46</color>
+    <color name="on_primary">#052818</color>
+    <color name="ic_launcher_background">#A22B3E</color>
+
+    <!-- 背景 / 卡片：深灰底 + 略亮的卡片，避免纯黑刺眼 -->
+    <color name="bg_page">#0E1012</color>
+    <color name="bg_card">#1A1D20</color>
+    <color name="divider">#292D32</color>
+    <color name="card_stroke">#262A2F</color>
+
+    <!-- 文字 -->
+    <color name="text_primary">#ECEFF1</color>
+    <color name="text_secondary">#A6ADB8</color>
+    <color name="text_muted">#727A86</color>
+
+    <!-- 状态色（深色下略提亮，避免发闷） -->
+    <color name="state_unknown">#6B7280</color>
+    <color name="state_ok">#34C759</color>
+    <color name="state_warn">#FFA53A</color>
+    <color name="state_bad">#FF5247</color>
+
+    <!-- 兼容别名 -->
+    <color name="status_ok">#34C759</color>
+    <color name="status_warn">#FFA53A</color>
+    <color name="status_bad">#FF5247</color>
+</resources>

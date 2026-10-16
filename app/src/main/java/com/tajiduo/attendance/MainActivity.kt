@@ -12,6 +12,7 @@ import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.button.MaterialButton
@@ -65,10 +66,13 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // 应用主题模式（需在 inflate 前设置，确保首帧就用正确配色）
+        settings = SettingsStore(this)
+        applyThemeMode(settings.themeMode)
+
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        settings = SettingsStore(this)
         stateStore = StateStore(this)
         accountStore = AccountStore(this)
 
@@ -115,6 +119,7 @@ class MainActivity : AppCompatActivity() {
         binding.switchKillAfterRun.isChecked = settings.killAfterRun
         binding.switchNotify.isChecked = settings.notifyEnabled
         binding.tvSignTime.text = formatHourMinute(settings.hour, settings.minute)
+        binding.tvTheme.text = themeLabel(settings.themeMode)
         binding.tvSharePlatform.text = settings.sharePlatform
         binding.etMaxRetries.setText(settings.maxRetries.toString())
         binding.etWebhook.setText(settings.notificationUrls)
@@ -123,6 +128,7 @@ class MainActivity : AppCompatActivity() {
         binding.etEmailRecipient.setText(settings.emailRecipient)
 
         binding.rowSignTime.setOnClickListener { showTimePicker() }
+        binding.rowTheme.setOnClickListener { showThemeDialog() }
         binding.rowSharePlatform.setOnClickListener { showPlatformDialog() }
 
         binding.switchCoinTasks.setOnCheckedChangeListener { _, value -> settings.coinTasks = value }
@@ -378,15 +384,15 @@ class MainActivity : AppCompatActivity() {
                 tv.setTextColor(ContextCompat.getColor(this, R.color.text_secondary))
             }
             status == "ok" -> {
-                tv.setBackgroundColor(ContextCompat.getColor(this, R.color.state_ok))
+                tv.setBackgroundResource(R.drawable.calendar_ok_bg)
                 tv.setTextColor(android.graphics.Color.WHITE)
             }
             status == "bad" -> {
-                tv.setBackgroundColor(ContextCompat.getColor(this, R.color.state_bad))
+                tv.setBackgroundResource(R.drawable.calendar_bad_bg)
                 tv.setTextColor(android.graphics.Color.WHITE)
             }
             isToday -> {
-                tv.setBackgroundResource(android.R.drawable.dialog_holo_light_frame)
+                tv.setBackgroundResource(R.drawable.calendar_today_bg)
                 tv.setTextColor(ContextCompat.getColor(this, R.color.brand))
             }
             else -> {
@@ -522,6 +528,34 @@ class MainActivity : AppCompatActivity() {
             button.isEnabled = true
             button.text = getString(R.string.login_send_code)
         }
+    }
+
+    private fun themeLabel(mode: Int): String = when (mode) {
+        1 -> "浅色"
+        2 -> "深色"
+        else -> "跟随系统"
+    }
+
+    private fun showThemeDialog() {
+        val labels = arrayOf("跟随系统", "浅色", "深色")
+        MaterialAlertDialogBuilder(this)
+            .setTitle("主题模式")
+            .setSingleChoiceItems(labels, settings.themeMode) { dialog, which ->
+                settings.themeMode = which
+                binding.tvTheme.text = themeLabel(which)
+                applyThemeMode(which)
+                dialog.dismiss()
+            }
+            .show()
+    }
+
+    private fun applyThemeMode(mode: Int) {
+        val nightMode = when (mode) {
+            1 -> AppCompatDelegate.MODE_NIGHT_NO
+            2 -> AppCompatDelegate.MODE_NIGHT_YES
+            else -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+        }
+        AppCompatDelegate.setDefaultNightMode(nightMode)
     }
 
     private fun showTimePicker() {
