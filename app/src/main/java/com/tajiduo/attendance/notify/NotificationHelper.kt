@@ -19,26 +19,31 @@ class NotificationHelper(private val context: Context) {
     fun ensureChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
-        if (manager.getNotificationChannel(CHANNEL_ID) != null) return
-        val channel = NotificationChannel(CHANNEL_ID, "签到状态", NotificationManager.IMPORTANCE_DEFAULT).apply {
-            description = "塔吉多自动签到状态通知"
+        // 每个渠道独立判断：老版本升级时 attendance_status 已存在，
+        // 若整体提前 return 会导致新增的 night_fail_alert 永远建不出来（通知被系统丢弃）。
+        if (manager.getNotificationChannel(CHANNEL_ID) == null) {
+            val channel = NotificationChannel(CHANNEL_ID, "签到状态", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = "塔吉多自动签到状态通知"
+            }
+            manager.createNotificationChannel(channel)
         }
-        manager.createNotificationChannel(channel)
         // 夜间失败提醒渠道：仅 23:30 补签最终失败时使用。
         // HIGH = 横幅短暂弹出 + 默认提示音 + 短震动 + 锁屏可见内容；但不设置全屏 Intent，
         // 因此只是“叮一下提醒你看一眼”，不是闹钟那种强制全屏打断。
-        val nightChannel = NotificationChannel(
-            CHANNEL_NIGHT_FAIL,
-            "夜间失败提醒",
-            NotificationManager.IMPORTANCE_HIGH,
-        ).apply {
-            description = "夜间补签确认失败时的提示音与锁屏提醒"
-            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-            setSound(android.provider.Settings.System.DEFAULT_NOTIFICATION_URI, null)
-            enableVibration(true)
-            vibrationPattern = longArrayOf(0, 150, 100, 150)
+        if (manager.getNotificationChannel(CHANNEL_NIGHT_FAIL) == null) {
+            val nightChannel = NotificationChannel(
+                CHANNEL_NIGHT_FAIL,
+                "夜间失败提醒",
+                NotificationManager.IMPORTANCE_HIGH,
+            ).apply {
+                description = "夜间补签确认失败时的提示音与锁屏提醒"
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                setSound(android.provider.Settings.System.DEFAULT_NOTIFICATION_URI, null)
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 150, 100, 150)
+            }
+            manager.createNotificationChannel(nightChannel)
         }
-        manager.createNotificationChannel(nightChannel)
     }
 
     /** 构建进行中通知（前台服务必须无条件构建，不依赖通知权限）。 */
